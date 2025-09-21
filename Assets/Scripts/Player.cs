@@ -9,21 +9,13 @@ public class Player : MonoBehaviour
     public float acceleration = 10f;
     public float deceleration = 20f;
 
-    [Header("Mouse Look Settings")]
-    public float mouseSensitivity = 2f;
-    public float maxLookAngle = 80f;
-    public bool invertY = false;
-    public bool lockCursor = true;
-
     [Header("References")]
     public Camera playerCamera;
-    public Transform cameraContainer;
 
     // Private variables
     private CharacterController characterController;
     private Vector3 currentVelocity;
     private float currentSpeed;
-    private float verticalRotation = 0f;
     private bool isRunning = false;
 
     void Start()
@@ -34,37 +26,17 @@ public class Player : MonoBehaviour
         if (playerCamera == null)
             playerCamera = Camera.main;
 
-        // If no camera container, create one
-        if (cameraContainer == null)
-        {
-            GameObject camContainer = new GameObject("CameraContainer");
-            camContainer.transform.parent = transform;
-            camContainer.transform.localPosition = new Vector3(0, 1.8f, 0);
-            cameraContainer = camContainer.transform;
-
-            if (playerCamera != null)
-            {
-                playerCamera.transform.parent = cameraContainer;
-                playerCamera.transform.localPosition = Vector3.zero;
-                playerCamera.transform.localRotation = Quaternion.identity;
-            }
-        }
-
-        // Lock cursor to center of screen
-        if (lockCursor)
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
+        // Lock cursor for game mode
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     void Update()
     {
-        HandleMouseLook();
         HandleMovement();
         HandleRunning();
 
-        // Toggle cursor lock with Escape key
+        // Press Escape to toggle cursor
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (Cursor.lockState == CursorLockMode.Locked)
@@ -80,28 +52,6 @@ public class Player : MonoBehaviour
         }
     }
 
-    void HandleMouseLook()
-    {
-        if (Cursor.lockState != CursorLockMode.Locked) return;
-
-        // Get mouse input
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
-
-        if (invertY) mouseY = -mouseY;
-
-        // Rotate player horizontally
-        transform.Rotate(Vector3.up * mouseX);
-
-        // Rotate camera vertically
-        verticalRotation -= mouseY;
-        verticalRotation = Mathf.Clamp(verticalRotation, -maxLookAngle, maxLookAngle);
-
-        if (cameraContainer != null)
-        {
-            cameraContainer.localRotation = Quaternion.Euler(verticalRotation, 0f, 0f);
-        }
-    }
 
     void HandleMovement()
     {
@@ -162,10 +112,10 @@ public class Player : MonoBehaviour
 
         currentVelocity = currentHorizontal + Vector3.up * verticalVelocity;
 
-        // Smoothly rotate player towards movement direction when there is input
+        // Rotate character to face movement direction (Assassin's Creed style)
         if (desiredDirection.sqrMagnitude > 0.001f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(desiredDirection, Vector3.up);
+            Quaternion targetRotation = Quaternion.LookRotation(desiredDirection);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
 
@@ -179,28 +129,9 @@ public class Player : MonoBehaviour
     }
 
     // Public methods for external control
-    public void SetMouseSensitivity(float sensitivity)
-    {
-        mouseSensitivity = sensitivity;
-    }
-
     public void SetMovementSpeed(float walk, float run)
     {
         walkSpeed = walk;
         runSpeed = run;
-    }
-
-    public void ToggleCursorLock()
-    {
-        if (Cursor.lockState == CursorLockMode.Locked)
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
     }
 }
