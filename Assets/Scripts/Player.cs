@@ -105,44 +105,70 @@ public class Player : MonoBehaviour
 
     void HandleMovement()
     {
-        // Get input
+        // Get raw movement input so partial presses keep strength information
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
 
-        // Calculate movement direction relative to player's facing direction
-        Vector3 direction = (transform.right * horizontal + transform.forward * vertical).normalized;
+        Vector2 moveInput = new Vector2(horizontal, vertical);
+        float inputMagnitude = Mathf.Clamp01(moveInput.magnitude);
 
-        // Determine target speed
-        float targetSpeed = 0f;
-        if (direction.magnitude > 0.1f)
+        // Resolve the desired move direction relative to the active camera.
+        // The camera forward/right are projected on the XZ plane so looking up/down不会影响移动方向。
+        Vector3 camForward = Vector3.forward;
+        Vector3 camRight = Vector3.right;
+
+        if (playerCamera != null)
         {
-            targetSpeed = isRunning ? runSpeed : walkSpeed;
+            Vector3 forward = playerCamera.transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude > 0.001f)
+            {
+                camForward = forward.normalized;
+            }
+
+            Vector3 right = playerCamera.transform.right;
+            right.y = 0f;
+            if (right.sqrMagnitude > 0.001f)
+            {
+                camRight = right.normalized;
+            }
         }
 
-        // Smoothly change current speed
-        if (targetSpeed > currentSpeed)
+        Vector3 desiredDirection = (camRight * moveInput.x + camForward * moveInput.y);
+        if (desiredDirection.sqrMagnitude > 0.001f)
         {
-            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, acceleration * Time.deltaTime);
+            desiredDirection.Normalize();
+        }
+
+        float targetSpeed = (isRunning ? runSpeed : walkSpeed) * inputMagnitude;
+        Vector3 desiredVelocity = desiredDirection * targetSpeed;
+
+        // Smooth acceleration / deceleration on the horizontal plane
+        Vector3 currentHorizontal = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+        float accelerationRate = desiredVelocity.magnitude > currentHorizontal.magnitude ? acceleration : deceleration;
+        currentHorizontal = Vector3.MoveTowards(currentHorizontal, desiredVelocity, accelerationRate * Time.deltaTime);
+        currentSpeed = currentHorizontal.magnitude;
+
+        // Apply gravity separately on Y axis
+        float verticalVelocity = currentVelocity.y;
+        if (characterController.isGrounded)
+        {
+            verticalVelocity = -0.1f;
         }
         else
         {
-            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, deceleration * Time.deltaTime);
+            verticalVelocity += Physics.gravity.y * Time.deltaTime;
         }
 
-        // Apply movement
-        currentVelocity = direction * currentSpeed;
+        currentVelocity = currentHorizontal + Vector3.up * verticalVelocity;
 
-        // Add gravity
-        if (!characterController.isGrounded)
+        // Smoothly rotate player towards movement direction when there is input
+        if (desiredDirection.sqrMagnitude > 0.001f)
         {
-            currentVelocity.y -= 9.81f * Time.deltaTime;
-        }
-        else
-        {
-            currentVelocity.y = -0.1f; // Small downward force to keep grounded
+            Quaternion targetRotation = Quaternion.LookRotation(desiredDirection, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
 
-        // Move the character
         characterController.Move(currentVelocity * Time.deltaTime);
     }
 
