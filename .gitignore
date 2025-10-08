@@ -19,6 +19,7 @@
 *.userprefs
 *.pidb
 *.booproj
+*.meta
 
 # Unity3D 生成的meta文件
 *.pidb.meta
